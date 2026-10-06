@@ -1,7 +1,7 @@
 {
   "name": "think-first",
-  "version": "0.2.1",
-  "description": "Makes Claude run a sequential-thinking step before its first write in each turn, and again before retrying a tool call that just failed. Installs the Model Context Protocol sequential-thinking server it relies on, pinned to one version.",
+  "version": "0.3.0",
+  "description": "Makes Claude run a sequential-thinking step before its first write in each request, and again before retrying a tool call that just failed. Uses the sequential-thinking server you already run, so the check also works inside cloud Cowork tasks.",
   "author": {
     "name": "Clybor Consulting"
   },
@@ -14,15 +14,6 @@
     "gate",
     "retry"
   ],
-  "mcpServers": {
-    "sequential-thinking": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-sequential-thinking@2025.11.25"
-      ]
-    }
-  },
   "userConfig": {
     "writes": {
       "type": "string",

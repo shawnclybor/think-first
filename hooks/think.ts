@@ -55,7 +55,8 @@ export const matches = (p: Patterns, tool: string): boolean => p.res.some(re => 
 
 const HOW =
   'Call the sequentialthinking tool to plan it, then retry this same call. ' +
-  'If you have no sequentialthinking tool, stop and tell the user that think-first needs one.'
+  'If you have no sequentialthinking tool, stop and tell the user that think-first needs a ' +
+  'sequential-thinking server (its README has the one-line command to add one).'
 
 export function decide(tool: string, s: State, writes: Patterns, retries: Patterns, mode: Mode): Decision {
   if (isThinkTool(tool)) return { kind: 'allow' }

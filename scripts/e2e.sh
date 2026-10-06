@@ -2,8 +2,7 @@
 # e2e.sh — think-first in real `claude -p` sessions. Costs four short model runs.
 # WebFetch stands in for a write, so nothing outside this machine is changed.
 #
-#   S  empty Claude config          -> the plugin's own sequential-thinking server connects
-#                                      (no model call; proves the plugin installs its server)
+# Needs a sequential-thinking server configured (see README, "What it needs").
 #   A  no thinking step             -> WebFetch blocked as a write
 #   B  thinking step first          -> a sequentialthinking tool runs, then WebFetch runs
 #   C  fetch fails, retried at once -> the retry is blocked (writes off, retries=WebFetch)
@@ -11,27 +10,37 @@
 #   E  gate on, thinking first, plus a settings hook -> the hook sees THINK_FIRST_ACTIVE=1
 #   F  same hook, no think-first    -> the hook sees it unset (the marker came from think-first)
 #
-# If you already run a sequential-thinking server yourself, Claude Code uses yours and skips
-# the plugin's duplicate; that is why S uses an empty config.
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 OUT="$(mktemp -d)"
+NAME=think-first
+
+# Isolation: other copies of this plugin (installed, or synced from your account) would
+# also load and blur the test. Every run below disables them, so "gate on" means only the
+# copy under test and "gate off" means no copy at all.
+iso() { # $1 = fixture settings file or "" -> prints a merged settings file
+  python3 - "$1" "$OUT" "$NAME" <<'PY'
+import json, os, sys, tempfile
+src, out, name = sys.argv[1:4]
+d = json.load(open(src)) if src else {}
+d.setdefault("enabledPlugins", {}).update({f"{name}@synced": False, f"{name}@clybor-plugins": False, f"life-crm-{name}@synced": False})
+fd, path = tempfile.mkstemp(suffix=".json", dir=out); os.write(fd, json.dumps(d).encode()); os.close(fd)
+print(path)
+PY
+}
 COMMON=(--permission-mode bypassPermissions --max-turns 8 --output-format stream-json --verbose)
-ON=(--plugin-dir . --settings tests/fixtures/e2e-settings.json)
+ON=(--plugin-dir . --settings "$(iso tests/fixtures/e2e-settings.json)")
 
 A="Use WebFetch to fetch https://example.com and tell me its title. Do not call any thinking tool first. If a call is blocked, quote the block message exactly and stop."
 B="First call the sequentialthinking tool once with thoughtNumber 1, totalThoughts 1, nextThoughtNeeded false, thought 'plan the fetch'. Then use WebFetch to fetch https://example.com and tell me its title. Quote any block message exactly."
 C="Use WebFetch to fetch https://nonexistent.invalid/page. If it fails, immediately make the exact same WebFetch call again, with no other tool call in between. Quote any block message exactly, then stop."
 
-CD="$(mktemp -d)"
-CLAUDE_CONFIG_DIR="$CD" claude -p "ok" --plugin-dir . --max-turns 1 --output-format stream-json --verbose < /dev/null > "$OUT/S.jsonl" 2>&1
-rm -rf "$CD"
 claude -p "$A" "${ON[@]}" "${COMMON[@]}" < /dev/null > "$OUT/A.jsonl" 2>&1
 claude -p "$B" "${ON[@]}" "${COMMON[@]}" < /dev/null > "$OUT/B.jsonl" 2>&1
-claude -p "$C" --plugin-dir . --settings tests/fixtures/e2e-retry-settings.json "${COMMON[@]}" < /dev/null > "$OUT/C.jsonl" 2>&1
-claude -p "$A" "${COMMON[@]}" < /dev/null > "$OUT/D.jsonl" 2>&1
-HANDOFF_OUT="$OUT/E.env" claude -p "$B" --plugin-dir . --settings tests/fixtures/e2e-handoff-settings.json "${COMMON[@]}" < /dev/null > "$OUT/E.jsonl" 2>&1
-HANDOFF_OUT="$OUT/F.env" claude -p "$A" --settings tests/fixtures/e2e-hook-only-settings.json "${COMMON[@]}" < /dev/null > "$OUT/F.jsonl" 2>&1
+claude -p "$C" --plugin-dir . --settings "$(iso tests/fixtures/e2e-retry-settings.json)" "${COMMON[@]}" < /dev/null > "$OUT/C.jsonl" 2>&1
+claude -p "$A" --settings "$(iso "")" "${COMMON[@]}" < /dev/null > "$OUT/D.jsonl" 2>&1
+HANDOFF_OUT="$OUT/E.env" claude -p "$B" --plugin-dir . --settings "$(iso tests/fixtures/e2e-handoff-settings.json)" "${COMMON[@]}" < /dev/null > "$OUT/E.jsonl" 2>&1
+HANDOFF_OUT="$OUT/F.env" claude -p "$A" --settings "$(iso tests/fixtures/e2e-hook-only-settings.json)" "${COMMON[@]}" < /dev/null > "$OUT/F.jsonl" 2>&1
 
 python3 - "$OUT" <<'PY'
 import json, os, sys
@@ -52,8 +61,6 @@ ok = True
 def check(leg, cond, what):
     global ok
     print(f"{leg}: {'PASS' if cond else 'FAIL'} — {what}"); ok &= cond
-u, r, s = calls("S")
-check("S", "plugin:think-first:sequential-thinking:connected" in s, f"plugin installed and connected its own server ({s})")
 u, r, s = calls("A")
 check("A", "WebFetch" in u and any("think-first: blocked WebFetch because it is a write" in x for x in r),
       "write blocked before any thinking step")

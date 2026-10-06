@@ -11,13 +11,22 @@ acting without a plan costs the most:
 
 One successful thinking step covers every write in the turn and clears earlier failures.
 
-## It installs what it needs
+## What it needs
 
-The plugin declares the Model Context Protocol sequential-thinking server
-(`@modelcontextprotocol/server-sequential-thinking`, pinned to `2025.11.25`). Claude Code
-starts it with `npx` when the plugin loads; there's nothing else to install. If you already
-run a server under the same name, Claude Code uses yours and skips the plugin's duplicate.
-think-first accepts any tool whose name ends in `sequentialthinking`.
+A sequential-thinking server. think-first checks that one was used; it doesn't bring its own.
+If you don't run one yet, add the standard one with a single command:
+
+```bash
+claude mcp add sequential-thinking -- npx -y @modelcontextprotocol/server-sequential-thinking@2025.11.25
+```
+
+think-first accepts any tool whose name ends in `sequentialthinking`. If none exists, it
+blocks writes and tells Claude to stop and say so, rather than letting them through.
+
+**Why it doesn't bundle the server.** A plugin that brings its own server runs on your
+computer in Claude Cowork, and its check never reaches cloud Cowork tasks. Without the
+server, think-first runs inside the task, and Cowork passes it the thinking server from
+your computer while the desktop app is open.
 
 ## Configure
 
@@ -74,7 +83,7 @@ Each check below has been shown to fail as well as pass:
 ```bash
 claude plugin test .          # 21 behaviour tests
 python3 scripts/mutate.py     # breaks the gate 18 ways; every break must turn a test red
-bash scripts/e2e.sh           # real sessions: server self-install, blocked, unblocked after thinking, retry blocked, control
+bash scripts/e2e.sh           # real sessions: blocked, unblocked after thinking, retry blocked, control, handoff
 ```
 
 `THINK_FIRST_FAULT=1` in the environment makes the gate crash on purpose. That's how the
