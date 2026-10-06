@@ -11,6 +11,7 @@ const THINK = { thoughtNumber: 1, totalThoughts: 1, nextThoughtNeeded: false, th
 
 // The floor stands for the engine: tools in `failing` answer with an error, the rest run.
 const marked: string[] = []
+const promptsReached: string[] = []
 
 function floor(on: On, opts: { failing?: Record<string, string>; env?: Record<string, string> } = {}) {
   const ran: string[] = []
@@ -25,7 +26,11 @@ function floor(on: On, opts: { failing?: Record<string, string>; env?: Record<st
     const err = opts.failing?.[e.tool]
     return err ? { result: err, text: err, isError: true } : { result: 'ran', text: 'ran' }
   })
-  on('prompt.submit', async (_$, e) => ({ text: e.text }))
+  promptsReached.length = 0
+  on('prompt.submit', async (_$, e) => {
+    promptsReached.push(e.text)
+    return { text: e.text }
+  })
   return ran
 }
 
@@ -81,6 +86,28 @@ describe('what counts as a new request', () => {
     const ran = floor(on)
     await $.tool.call({ tool: ST, ...THINK })
     await $.prompt.submit({ text: 'scheduled', wait: false, origin: { kind: 'scheduled-trigger' } })
+    const r = await $.tool.call({ tool: WRITE, title: 'x' })
+    expect(denial(r)).toContain('is a write')
+    expect(ran).toEqual([ST])
+  })
+})
+
+describe('when the prompt hook itself fails', () => {
+  test('a crash still resets the thinking step, and the prompt goes through',
+    async ($, on) => {
+      const ran = floor(on, { env: { THINK_FIRST_FAULT: 'prompt' } })
+      await $.tool.call({ tool: ST, ...THINK })
+      await $.prompt.submit({ text: 'next request', wait: false, origin: { kind: 'composer' } })
+      const r = await $.tool.call({ tool: WRITE, title: 'x' })
+      expect(promptsReached).toEqual(['next request'])
+      expect(denial(r)).toContain('is a write')
+      expect(ran).toEqual([ST])
+    })
+
+  test('a prompt that arrives with no origin still resets', async ($, on) => {
+    const ran = floor(on)
+    await $.tool.call({ tool: ST, ...THINK })
+    await $.prompt.submit({ text: 'next request', wait: false } as never)
     const r = await $.tool.call({ tool: WRITE, title: 'x' })
     expect(denial(r)).toContain('is a write')
     expect(ran).toEqual([ST])

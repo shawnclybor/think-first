@@ -15,12 +15,25 @@ export const register: Register = (on, options) => {
   const mode = options.mode === 'warn' ? 'warn' : 'enforce'
   const s = newState()
 
-  // Each new request starts a new turn: the next write needs a fresh thinking step.
-  on('prompt.submit', async ($, e, next) => {
-    if (CONTINUES.has(e.origin.kind)) return next(e)
+  const reset = () => {
     s.thought = false
     s.thinkErrors = 0
     s.degraded = null
+  }
+
+  // Each new request starts a new turn: the next write needs a fresh thinking step.
+  on('prompt.submit', async ($, e, next) => {
+    if ((await $.env.get('THINK_FIRST_FAULT')) === 'prompt') {
+      throw new Error('fault injected with THINK_FIRST_FAULT=prompt')
+    }
+    if (CONTINUES.has(e.origin?.kind ?? '')) return next(e)
+    reset()
+    return next(e)
+  }).catch(async ($, e, next) => {
+    // The hook failed. Claude Code would skip it and let the prompt through, but the
+    // reset would never happen, and the last request's thinking step would silently
+    // cover this request's writes. Reset anyway: stricter, and the prompt still goes on.
+    reset()
     return next(e)
   })
 

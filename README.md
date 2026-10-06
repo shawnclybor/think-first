@@ -40,7 +40,9 @@ Run `/plugin configure think-first`, then set:
 ## When the gate itself fails
 
 If a setting can't be read, or the gate crashes, think-first blocks MCP tools and every
-write. It never blocks the thinking tool itself, so there's always a way out.
+write. It never blocks the thinking tool itself, so there's always a way out. If the hook
+that notices each new request crashes, the request still goes through and think-first
+resets anyway, so a thinking step from the last request can never cover this one.
 
 ## Running alongside an older hook-based gate
 
@@ -70,8 +72,8 @@ registry.
 Each check below has been shown to fail as well as pass:
 
 ```bash
-claude plugin test .          # 19 behaviour tests
-python3 scripts/mutate.py     # breaks the gate 17 ways; every break must turn a test red
+claude plugin test .          # 21 behaviour tests
+python3 scripts/mutate.py     # breaks the gate 18 ways; every break must turn a test red
 bash scripts/e2e.sh           # real sessions: server self-install, blocked, unblocked after thinking, retry blocked, control
 ```
 

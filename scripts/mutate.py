@@ -49,13 +49,19 @@ MUTANTS = [
     ("T12", "notes to Claude are dropped", REGISTER,
      "if (note && r.deny === undefined)", "if (false)"),
     ("T14", "nothing counts as continuing work; every prompt resets", REGISTER,
-     "    if (CONTINUES.has(e.origin.kind)) return next(e)\n", ""),
+     "    if (CONTINUES.has(e.origin?.kind ?? '')) return next(e)\n", ""),
     ("T15", "no prompt resets except the person typing", REGISTER,
-     "if (CONTINUES.has(e.origin.kind)) return next(e)", "if (e.origin.kind !== 'composer') return next(e)"),
+     "if (CONTINUES.has(e.origin?.kind ?? '')) return next(e)", "if (e.origin?.kind !== 'composer') return next(e)"),
     ("T16", "marks itself active even with broken settings", REGISTER,
      "const announce = writes.res.length > 0 && writes.errors.length === 0 && retries.errors.length === 0", "const announce = true"),
     ("T17", "never marks itself active", REGISTER,
      "const announce = writes.res.length > 0 && writes.errors.length === 0 && retries.errors.length === 0", "const announce = false"),
+    ("T18", "a crashed prompt hook does not reset", REGISTER,
+     "    // cover this request's writes. Reset anyway: stricter, and the prompt still goes on.\n    reset()\n", "    // cover this request's writes. Reset anyway: stricter, and the prompt still goes on.\n"),
+    # No mutant for the `e.origin?.kind` safe read: removing it makes a prompt with no
+    # origin crash the hook, and the .catch then resets exactly as the hook would have.
+    # Same observable behaviour, so no test can (or should) tell them apart; T18 covers
+    # the .catch that makes that true.
     ("T13", "a successful thinking step is not recorded", REGISTER,
      "        s.thought = true\n", ""),
 ]

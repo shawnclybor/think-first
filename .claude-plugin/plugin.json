@@ -1,10 +1,12 @@
 {
   "name": "think-first",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Makes Claude run a sequential-thinking step before its first write in each turn, and again before retrying a tool call that just failed. Installs the Model Context Protocol sequential-thinking server it relies on, pinned to one version.",
   "author": {
     "name": "Clybor Consulting"
   },
+  "homepage": "https://github.com/shawnclybor/think-first",
+  "repository": "https://github.com/shawnclybor/think-first",
   "license": "MIT",
   "keywords": [
     "mod",
