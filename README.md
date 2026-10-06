@@ -42,6 +42,14 @@ Run `/plugin configure think-first`, then set:
 If a setting can't be read, or the gate crashes, think-first blocks MCP tools and every
 write. It never blocks the thinking tool itself, so there's always a way out.
 
+## Running alongside an older hook-based gate
+
+If you already enforce the same thing with a command hook, both would fire. Once think-first has
+valid settings, it sets `THINK_FIRST_ACTIVE=1` for every hook Claude Code starts after its first check. Make the
+old hook exit early when it sees that, and it steps aside only where think-first is actually
+running. Anywhere mods don't load (another host, or mods switched off) the old hook keeps
+enforcing.
+
 ## Where it runs
 
 think-first is a mod: a plugin with code that runs inside Claude Code. It needs Claude Code
@@ -52,7 +60,7 @@ Cowork, and think-first hasn't been tested there.
 ## What it reaches
 
 `claude plugin validate .` lists everything the module touches. It hooks `prompt.submit` and
-`tool.call`, and its only call is `$.env.get` for one variable, `THINK_FIRST_FAULT`. The
+`tool.call`, and its only calls are `$.env.get` for one variable, `THINK_FIRST_FAULT`, and `$.env.set` for one, `THINK_FIRST_ACTIVE`. The
 module makes no network requests and reads or writes no files. The bundled server is
 started by Claude Code itself, with `npx` downloading the pinned package from the npm
 registry.
@@ -62,8 +70,8 @@ registry.
 Each check below has been shown to fail as well as pass:
 
 ```bash
-claude plugin test .          # 17 behaviour tests
-python3 scripts/mutate.py     # breaks the gate 15 ways; every break must turn a test red
+claude plugin test .          # 19 behaviour tests
+python3 scripts/mutate.py     # breaks the gate 17 ways; every break must turn a test red
 bash scripts/e2e.sh           # real sessions: server self-install, blocked, unblocked after thinking, retry blocked, control
 ```
 

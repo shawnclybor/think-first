@@ -24,7 +24,21 @@ export const register: Register = (on, options) => {
     return next(e)
   })
 
+  // Tell hooks that start after this point that think-first is enforcing, so an older
+  // hook-based thinking gate can step aside instead of double-gating. Only with valid
+  // settings: a gate that cannot read its own patterns must never stand another one down.
+  const announce = writes.res.length > 0 && writes.errors.length === 0 && retries.errors.length === 0
+  let announced = false
+
   on('tool.call', async ($, e, next) => {
+    if (announce && !announced) {
+      try {
+        await $.env.set('THINK_FIRST_ACTIVE', '1')
+        announced = true
+      } catch {
+        // A marker that cannot be set only means the older gate keeps running too.
+      }
+    }
     if ((await $.env.get('THINK_FIRST_FAULT')) === '1') {
       throw new Error('fault injected with THINK_FIRST_FAULT=1')
     }

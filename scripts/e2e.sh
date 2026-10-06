@@ -8,6 +8,8 @@
 #   B  thinking step first          -> a sequentialthinking tool runs, then WebFetch runs
 #   C  fetch fails, retried at once -> the retry is blocked (writes off, retries=WebFetch)
 #   D  gate OFF, same as A          -> WebFetch runs (proves A's block came from think-first)
+#   E  gate on, thinking first, plus a settings hook -> the hook sees THINK_FIRST_ACTIVE=1
+#   F  same hook, no think-first    -> the hook sees it unset (the marker came from think-first)
 #
 # If you already run a sequential-thinking server yourself, Claude Code uses yours and skips
 # the plugin's duplicate; that is why S uses an empty config.
@@ -28,6 +30,8 @@ claude -p "$A" "${ON[@]}" "${COMMON[@]}" < /dev/null > "$OUT/A.jsonl" 2>&1
 claude -p "$B" "${ON[@]}" "${COMMON[@]}" < /dev/null > "$OUT/B.jsonl" 2>&1
 claude -p "$C" --plugin-dir . --settings tests/fixtures/e2e-retry-settings.json "${COMMON[@]}" < /dev/null > "$OUT/C.jsonl" 2>&1
 claude -p "$A" "${COMMON[@]}" < /dev/null > "$OUT/D.jsonl" 2>&1
+HANDOFF_OUT="$OUT/E.env" claude -p "$B" --plugin-dir . --settings tests/fixtures/e2e-handoff-settings.json "${COMMON[@]}" < /dev/null > "$OUT/E.jsonl" 2>&1
+HANDOFF_OUT="$OUT/F.env" claude -p "$A" --settings tests/fixtures/e2e-hook-only-settings.json "${COMMON[@]}" < /dev/null > "$OUT/F.jsonl" 2>&1
 
 python3 - "$OUT" <<'PY'
 import json, os, sys
@@ -61,5 +65,10 @@ u, r, s = calls("C")
 check("C", u.count("WebFetch") >= 2 and any("last call failed" in x for x in r), "immediate retry after a failure blocked")
 u, r, s = calls("D")
 check("D", "WebFetch" in u and not any("think-first: blocked" in x for x in r), "without think-first the write is not blocked")
+def marker(leg):
+    p = os.path.join(out, leg + ".env")
+    return open(p).read() if os.path.exists(p) else "(hook never ran)"
+check("E", marker("E") == "1", f"a settings hook started after think-first saw THINK_FIRST_ACTIVE={marker('E')}")
+check("F", marker("F") == "unset", f"without think-first the same hook saw {marker('F')}")
 print("transcripts:", out); sys.exit(0 if ok else 1)
 PY

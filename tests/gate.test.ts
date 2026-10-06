@@ -10,9 +10,16 @@ const READ = 'mcp__notes__get_page'
 const THINK = { thoughtNumber: 1, totalThoughts: 1, nextThoughtNeeded: false, thought: 'plan' }
 
 // The floor stands for the engine: tools in `failing` answer with an error, the rest run.
+const marked: string[] = []
+
 function floor(on: On, opts: { failing?: Record<string, string>; env?: Record<string, string> } = {}) {
   const ran: string[] = []
+  marked.length = 0
   mock.env(on, opts.env ?? {})
+  on('env.set', async (_$, e) => {
+    marked.push(`${e.name}=${e.value}`)
+    return { value: undefined }
+  })
   on('tool.call', async (_$, e) => {
     ran.push(e.tool)
     const err = opts.failing?.[e.tool]
@@ -177,5 +184,19 @@ describe('modes and failures of the gate', () => {
     expect(denial(r)).toContain('gate failed')
     // The thinking call is passed through on purpose: blocking it would leave no way out.
     expect(ran).toEqual([ST])
+  })
+})
+
+describe('handing off to an older hook-based thinking gate', () => {
+  test('with valid settings, think-first marks itself active for later hooks', async ($, on) => {
+    floor(on)
+    await $.tool.call({ tool: READ, id: 'x' })
+    expect(marked).toEqual(['THINK_FIRST_ACTIVE=1'])
+  })
+
+  test('with a broken pattern, it never marks itself active', { options: { writes: '/create(/' } }, async ($, on) => {
+    floor(on)
+    await $.tool.call({ tool: 'Read', file_path: 'x' })
+    expect(marked).toEqual([])
   })
 })

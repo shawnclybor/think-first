@@ -52,6 +52,10 @@ MUTANTS = [
      "    if (CONTINUES.has(e.origin.kind)) return next(e)\n", ""),
     ("T15", "no prompt resets except the person typing", REGISTER,
      "if (CONTINUES.has(e.origin.kind)) return next(e)", "if (e.origin.kind !== 'composer') return next(e)"),
+    ("T16", "marks itself active even with broken settings", REGISTER,
+     "const announce = writes.res.length > 0 && writes.errors.length === 0 && retries.errors.length === 0", "const announce = true"),
+    ("T17", "never marks itself active", REGISTER,
+     "const announce = writes.res.length > 0 && writes.errors.length === 0 && retries.errors.length === 0", "const announce = false"),
     ("T13", "a successful thinking step is not recorded", REGISTER,
      "        s.thought = true\n", ""),
 ]

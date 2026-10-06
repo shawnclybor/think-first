@@ -1,0 +1,2 @@
+{ "hooks": { "PreToolUse": [ { "matcher": "WebFetch", "hooks": [ { "type": "command",
+    "command": "printf '%s' \"${THINK_FIRST_ACTIVE:-unset}\" > \"$HANDOFF_OUT\"" } ] } ] } }
