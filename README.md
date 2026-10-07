@@ -28,6 +28,16 @@ computer in Claude Cowork, and its check never reaches cloud Cowork tasks. Witho
 server, think-first runs inside the task, and Cowork passes it the thinking server from
 your computer while the desktop app is open.
 
+## Install
+
+```bash
+git clone https://github.com/shawnclybor/think-first.git
+claude --plugin-dir ./think-first
+```
+
+`--plugin-dir` loads the plugin for that session only. Add the sequential-thinking server
+first (above).
+
 ## Configure
 
 Run `/plugin configure think-first`, then set:
@@ -72,9 +82,8 @@ Cowork, and think-first hasn't been tested there.
 
 `claude plugin validate .` lists everything the module touches. It hooks `prompt.submit` and
 `tool.call`, and its only calls are `$.env.get` for one variable, `THINK_FIRST_FAULT`, and `$.env.set` for one, `THINK_FIRST_ACTIVE`. The
-module makes no network requests and reads or writes no files. The bundled server is
-started by Claude Code itself, with `npx` downloading the pinned package from the npm
-registry.
+module makes no network requests and reads or writes no files. It starts no server; the
+sequential-thinking server is the one you add yourself.
 
 ## Verify it
 
