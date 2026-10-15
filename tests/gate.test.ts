@@ -227,3 +227,28 @@ describe('handing off to an older hook-based thinking gate', () => {
     expect(marked).toEqual([])
   })
 })
+
+// 2026-10-12: when the bridge to the computer drops, the thinking tool leaves the tool
+// list, and the engine refuses a call to it before any tool.call hook runs. The gate asks
+// $.tool.list() before blocking instead of waiting for an error that never arrives.
+const tools = (on: On, names: string[]) =>
+  on('tool.list', async () => ({ value: names.map(name => ({ name, description: name, mcp: true })) }))
+
+describe('thinking tool gone from the session', () => {
+  test('with no thinking tool listed, a write runs with a note to disclose', async ($, on) => {
+    const ran = floor(on)
+    tools(on, [WRITE, READ])
+    const r: any = await $.tool.call({ tool: WRITE, title: 'x' })
+    expect(denial(r)).toBeUndefined()
+    expect(ran).toEqual([WRITE])
+    expect(String(r.context ?? '')).toContain('no sequential-thinking tool is available')
+  })
+
+  test('with the thinking tool listed but not called, the write is still blocked', async ($, on) => {
+    const ran = floor(on)
+    tools(on, [WRITE, READ, ST])
+    const r = await $.tool.call({ tool: WRITE, title: 'x' })
+    expect(denial(r)).toContain('is a write')
+    expect(ran).toEqual([])
+  })
+})

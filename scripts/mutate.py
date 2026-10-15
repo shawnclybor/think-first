@@ -64,6 +64,10 @@ MUTANTS = [
     # the .catch that makes that true.
     ("T13", "a successful thinking step is not recorded", REGISTER,
      "        s.thought = true\n", ""),
+    ("T19", "a missing thinking tool never lets a write through", REGISTER,
+     "if (names !== null && !hasThinkTool(names)) d =", "if (false) d ="),
+    ("T20", "a listed but uncalled thinking tool lets a write through", REGISTER,
+     "if (names !== null && !hasThinkTool(names)) d =", "if (names !== null) d ="),
 ]
 
 

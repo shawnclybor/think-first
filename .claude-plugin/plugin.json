@@ -1,6 +1,6 @@
 {
   "name": "think-first",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Makes Claude run a sequential-thinking step before its first write in each request, and again before retrying a tool call that just failed. Uses the sequential-thinking server you already run, so the check also works inside cloud Cowork tasks.",
   "author": {
     "name": "Clybor Consulting"

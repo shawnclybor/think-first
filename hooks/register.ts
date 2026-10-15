@@ -1,5 +1,5 @@
 import type { Register } from 'claude-code'
-import { CONTINUES, decide, isMalformed, isThinkTool, matches, newState, parsePatterns, type Patterns } from './think.ts'
+import { ABSENT_NOTE, CONTINUES, decide, hasThinkTool, isAbsent, isMalformed, isThinkTool, matches, newState, parsePatterns, type Patterns } from './think.ts'
 
 const read = (text: unknown): Patterns => {
   try {
@@ -64,13 +64,30 @@ export const register: Register = (on, options) => {
         s.thinkErrors = 0
         s.degraded = null
       } else if (r.isError && !isMalformed(r.text ?? '')) {
+        const text = r.text ?? 'error'
         s.thinkErrors += 1
-        if (s.thinkErrors >= 2) s.degraded = (r.text ?? 'error').slice(0, 200)
+        // One strike is enough when the tool is absent (see isAbsent): a second can never
+        // arrive, so waiting for it is waiting forever. Two strikes still apply to a server
+        // that is present and erroring, where a retry might genuinely succeed.
+        if (isAbsent(text) || s.thinkErrors >= 2) s.degraded = text.slice(0, 200)
       }
       return r
     }
 
-    const d = decide(e.tool, s, writes, retries, mode)
+    let d = decide(e.tool, s, writes, retries, mode)
+    if (d.kind !== 'allow') {
+      // About to block. First ask whether a thinking tool exists at all: when its server is
+      // gone the model cannot satisfy this gate, and a call to the missing tool never reaches
+      // this hook (see think.ts). Re-checked on every block rather than stored, so the gate
+      // re-arms the moment the server is back. If the list cannot be read, keep the block.
+      let names: string[] | null = null
+      try {
+        names = (await $.tool.list()).map(t => t.name)
+      } catch {
+        names = null
+      }
+      if (names !== null && !hasThinkTool(names)) d = { kind: 'allow', note: ABSENT_NOTE }
+    }
     if (d.kind === 'deny') return { deny: d.reason }
 
     const r = await next(e)

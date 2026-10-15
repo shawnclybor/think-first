@@ -33,6 +33,33 @@ export const isThinkTool = (tool: string): boolean =>
 // healthy. Only other errors count toward "unavailable".
 export const isMalformed = (text: string): boolean => /-32602|invalid (params|arguments)|validation/i.test(text)
 
+// A thinking tool that ERRORS is not the same as one that is GONE.
+//
+// When the bridge carrying the local MCPs drops, the thinking tool leaves the tool list.
+// Measured 2026-10-12 (claude -p, a plugin-dir copy of this mod, the thinking server left
+// out): the model's call to the missing tool is refused by the engine with "No such tool
+// available" BEFORE any tool.call hook runs, so this mod never sees it. Waiting for that
+// error to set `degraded` therefore waits forever, and every write stays blocked. A
+// scheduled daily-briefing run (2026-10-12) and email-review (2026-09-30) both lost their
+// writes this way.
+//
+// So the gate asks the engine directly, and only when it is about to block:
+// `$.tool.list()` returns every tool the model has, deferred ones included (measured the
+// same day: a never-loaded deferred thinking tool is listed). No thinking tool listed means
+// the step cannot be taken, so the call goes through with a note the model must disclose.
+// A listed thinking tool that simply was not called still blocks. See register.ts.
+export const hasThinkTool = (names: readonly string[]): boolean => names.some(isThinkTool)
+
+export const ABSENT_NOTE =
+  'think-first: no sequential-thinking tool is available in this session (its server is not ' +
+  'connected; in a cloud session the bridge to the computer is usually down), so this call ran ' +
+  'without a thinking step. Say in your reply that the thinking step was unavailable.'
+
+// Kept as a second route: a thinking tool that IS listed but whose server answers that the
+// tool is unavailable is conclusive on the first answer.
+export const isAbsent = (text: string): boolean =>
+  /no such tool|tool not found|unknown tool|not available|does not offer this tool/i.test(text)
+
 // Patterns separated by ";" or newlines: a glob ("*" matches anything) or /regex/flags.
 export function parsePatterns(text: string): Patterns {
   const res: RegExp[] = []
@@ -55,8 +82,10 @@ export const matches = (p: Patterns, tool: string): boolean => p.res.some(re => 
 
 const HOW =
   'Call the sequentialthinking tool to plan it, then retry this same call. ' +
-  'If you have no sequentialthinking tool, stop and tell the user that think-first needs a ' +
-  'sequential-thinking server (its README has the one-line command to add one).'
+  'If that tool fails because its server is unreachable (not a parameter error), the turn drops ' +
+  'to degraded mode and the retry is allowed through \u2014 then say in your reply that the ' +
+  'thinking step was unavailable and why. An unreachable thinking server must not strand an ' +
+  'unattended run; report the degradation, do not abandon the work.'
 
 export function decide(tool: string, s: State, writes: Patterns, retries: Patterns, mode: Mode): Decision {
   if (isThinkTool(tool)) return { kind: 'allow' }
