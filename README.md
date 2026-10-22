@@ -3,13 +3,33 @@
 think-first makes Claude Code run a sequential-thinking step at the two moments where
 acting without a plan costs the most:
 
-1. **Before the first write in each turn.** A turn starts with each new request, whether
-   typed, sent with `claude -p`, sent from a phone, fired by a schedule, or sent by another
-   session. A background task finishing doesn't start a new turn.
-2. **Before retrying a tool call that just failed.** A plan made earlier in the turn doesn't
-   cover a failure that came after it.
+1. **Before a write.** One successful thinking step covers every write for the next 10
+   minutes, then expires. A new request does not clear it early (changed in 0.4.0).
+2. **Before retrying a write that just failed.** A plan made earlier doesn't cover a failure
+   that came after it. A failed read retries freely.
 
-One successful thinking step covers every write in the turn and clears earlier failures.
+A successful thinking step also clears earlier failures.
+
+**Shell tools are judged by their command.** For `device_bash` and Desktop Commander
+`start_process`, think-first reads the `command` argument. A command with no write signal
+(redirects other than `2>&1` / `>/dev/null`, `rm`, `mv`, `cp`, `mkdir`, `touch`, `ln`,
+`chmod`, `tee`, `sed -i`, `git commit`/`push`/`reset`/..., package installs, `curl -X POST`,
+`kill`, heredocs, interpreters such as `python3 -c` or `bash script.sh`, and others; see
+`isShellWrite` in `hooks/think.ts`) is a read and runs without a thinking step. A command that
+can't be read counts as a write.
+
+**Scheduled runs warn instead of block.** When the request came from a scheduled task
+(prompt origin `scheduled-trigger`), a call that would be blocked runs, and Claude is told to
+say in its report that it skipped the thinking step. Nobody is there to answer a block.
+
+## Block log
+
+Every block, warning, and allow-with-note is appended to the plugin's own `$.store` under the
+key `log`: a JSON array of `{ ts, session, origin, tool, decision, reason }`, the last 500
+entries. `decision` is `deny`, `warn`, `allow-note` (thinking tool missing) or `deny-crash`.
+The store is a JSON file of the plugin's own under the Claude Code configuration directory
+(`~/.claude`). Find it with `grep -rl '"log"' ~/.claude --include='*.json' | grep -i think`
+and read it with `jq '.log[-20:]'` on that file. Logging never changes a decision.
 
 ## What it needs
 
@@ -60,8 +80,8 @@ Run `/plugin configure think-first`, then set:
 
 If a setting can't be read, or the gate crashes, think-first blocks MCP tools and every
 write. It never blocks the thinking tool itself, so there's always a way out. If the hook
-that notices each new request crashes, the request still goes through and think-first
-resets anyway, so a thinking step from the last request can never cover this one.
+that notices each new request crashes, the request still goes through, degraded mode is
+cleared, and the request is treated as attended (blocks stay blocks).
 
 ## Running alongside an older hook-based gate
 
